@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <script src="js/babylon.js"></script>
+    <script src="js/hand.minified-1.2.js"></script>
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+    <script type="application/vertexShader" id="vertexPlanet">
+        precision highp float;
+
+        // Attributes
+        attribute vec3 position;
+        attribute vec3 normal;
+        attribute vec2 uv;
+
+        // Uniforms
+        uniform mat4 world;
+        uniform mat4 worldViewProjection;
+
+        // Varying
+        varying vec2 vUV;
+        varying vec3 vPositionW;
+        varying vec3 vNormalW;
+
+        void main(void) {
+            vec4 outPosition = worldViewProjection * vec4(position, 1.0);
+            gl_Position = outPosition;
+
+            vPositionW = vec3(world * vec4(position, 1.0));
+            vNormalW = normalize(vec3(world * vec4(normal, 0.0)));
+
+            vUV = uv;
+        }
+    </script>
+
+    <script type="application/fragmentShader" id="fragmentPlanet">
+        precision highp float;
+
+        // Varying
+        varying vec2 vUV;
+        varying vec3 vPositionW;
+        varying vec3 vNormalW;
+
+        // Refs
+        uniform vec3 lightPosition;
+        uniform sampler2D diffuseTexture;
+        uniform sampler2D nightTexture;
+
+
+        void main(void) {
+            vec3 direction = lightPosition - vPositionW;
+            vec3 lightVectorW = normalize(direction);
+
+
+            // diffuse
+            float lightDiffuse = max(0.05, dot(vNormalW, lightVectorW));
+
+            vec3 color;
+            vec4 nightColor = texture2D(nightTexture, vUV).rgba;
+            vec3 diffuseColor = texture2D(diffuseTexture, vUV).rgb;
+
+            color = diffuseColor * lightDiffuse + (nightColor.rgb * nightColor.a * pow((1.0 - lightDiffuse), 6.0));
+            gl_FragColor = vec4(color, 1.0);
+        }
+    </script>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+    //здесь будут основные конфиги
+    var config = {
+        PLANET_RADIUS: 50, //радиус земли
+        PLANET_V: 300, // количество вершин
+        MOON_RADIUS: 25, //радиус луны
+    };
+
+    //проверяем, поддерживается ли работа фреймворка
+    if (BABYLON.Engine.isSupported()) {
+        var canvas = document.getElementById("canvas"); //находим канвас, в котором будем рисовать сцену
+        var engine = new BABYLON.Engine(canvas, true); //создаем движок
+        var scene = new BABYLON.Scene(engine); //создаем сцену
+
+        //создаем камеру, которая вращается вокруг занной цели (это может быть меш или точка)
+        var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, 3*Math.PI / 7, 110, new BABYLON.Vector3(55, 5, 55), scene);
+        scene.activeCamera = camera; //задаем сцене активную камеру, т.е. ту через которую мы видим сцену
+        camera.attachControl(canvas, true); //добавляем возможность управления камерой
+
+
+        //создаем скайбокс
+        var skybox = BABYLON.Mesh.CreateBox("universe", 10000.0, scene); //создаем гигантский куб
+
+        var skyboxMaterial = new BABYLON.StandardMaterial("universe", scene); //создаем материал
+        skyboxMaterial.backFaceCulling = false; //Включаем видимость меша изнутри
+        skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("textures/universe/universe", scene); //задаем текстуру скайбокса как текстуру отражения
+        skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE; //настраиваем скайбокс текстуру так, чтобы грани были повернуты правильно друг к другу
+        skyboxMaterial.disableLighting = true; //отключаем влияние света
+        skybox.material = skyboxMaterial; //задаем матерал мешу
+
+        //Земля
+        var planet = BABYLON.Mesh.CreateSphere("planet", config.PLANET_V, config.PLANET_RADIUS, scene, true);
+        planet.position = new BABYLON.Vector3(-250.0, -10,0, -250.0); //задам позицию на сцене
+        planet.rotation.z = Math.PI;
+        planet.applyDisplacementMap("/textures/earth-height.png", 0, 1); //применяем карту высот - смещение => от 0 для черных фрагментов до 1 для белых
+
+        var moon = BABYLON.Mesh.CreateSphere("moon", 25, config.MOON_RADIUS, scene); //Луна
+        moon.parent = planet; //задаем родителя - Землю
+        moon.position = new BABYLON.Vector3(-102.0, 0,0, 0.0); //задаем позицию луны
+
+        var moonMat = new BABYLON.StandardMaterial("moonMat", scene); //Материал Луны
+        moonMat.diffuseTexture = new BABYLON.Texture("textures/moon.jpg", scene); //задаем базовую текстуру
+        moonMat.bumpTexture = new BABYLON.Texture("textures/moon_bump.jpg", scene);
+        moonMat.specularTexture = new BABYLON.Texture("textures/moon_spec.jpg", scene);
+
+        moon.material = moonMat; //задаем луне материал
+
+        camera.target = planet; //Задаем точнку вращения камеры
+
+        //создаем точечный источник света в точке 0,0,0
+        var lightSourceMesh = new BABYLON.PointLight("Omni", new BABYLON.Vector3(0.0, 0,0, 0.0), scene);
+        /*цвет света*/
+        lightSourceMesh.diffuse = new BABYLON.Color3(0.5, 0.5, 0.5);
+
+
+        //Материал Земли
+        var planetMat = new BABYLON.ShaderMaterial("planetMat", scene, {
+                    vertexElement: "vertexPlanet",
+                    fragmentElement: "fragmentPlanet",
+                },
+                {
+                    attributes: ["position", "normal", "uv"],
+                    uniforms: ["world", "worldView", "worldViewProjection", "diffuseTexture", "nightTexture"],
+
+                });
+
+        var diffuseTexture = new BABYLON.Texture("textures/earth-diffuse.jpg", scene);
+        var nightTexture = new BABYLON.Texture("textures/earth-night-o2.png", scene);
+
+        planetMat.setVector3("vLightPosition", lightSourceMesh.position); //задаем позицию источника света
+        planetMat.setTexture("diffuseTexture", diffuseTexture); //задаем базовую текстуру материалу
+        planetMat.setTexture("nightTexture", nightTexture);//задаем ночную текстуру материалу
+
+        planetMat.backFaceCulling = false;
+        planet.material = planetMat;
+
+        engine.runRenderLoop(function() { //инициируем перерисовку
+
+            planet.rotation.y+= 0.001; //поворот на 0.001 радиана
+            scene.render(); //перерисовываем сцену (60 раз в секунду)
+        });
+    }
+</script>
+</body>

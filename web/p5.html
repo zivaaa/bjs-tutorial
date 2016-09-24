@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <script src="js/babylon.js"></script>
+    <script src="js/hand.minified-1.2.js"></script>
+    <script src="materials/babylon.fireProceduralTexture.js"></script>
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+    <script type="application/vertexShader" id="vertexPlanet">
+        precision highp float;
+
+        // Attributes
+        attribute vec3 position;
+        attribute vec3 normal;
+        attribute vec2 uv;
+
+        // Uniforms
+        uniform mat4 world;
+        uniform mat4 worldViewProjection;
+
+        // Varying
+        varying vec2 vUV;
+        varying vec3 vPositionW;
+        varying vec3 vNormalW;
+
+        void main(void) {
+            vec4 outPosition = worldViewProjection * vec4(position, 1.0);
+            gl_Position = outPosition;
+
+            vPositionW = vec3(world * vec4(position, 1.0));
+            vNormalW = normalize(vec3(world * vec4(normal, 0.0)));
+
+            vUV = uv;
+        }
+    </script>
+
+    <script type="application/fragmentShader" id="fragmentPlanet">
+        precision highp float;
+
+        // Varying
+        varying vec2 vUV;
+        varying vec3 vPositionW;
+        varying vec3 vNormalW;
+
+        // Refs
+        uniform vec3 lightPosition;
+        uniform sampler2D diffuseTexture;
+        uniform sampler2D nightTexture;
+
+
+        void main(void) {
+            vec3 direction = lightPosition - vPositionW;
+            vec3 lightVectorW = normalize(direction);
+
+
+            // diffuse
+            float lightDiffuse = max(0.05, dot(vNormalW, lightVectorW));
+
+            vec3 color;
+            vec4 nightColor = texture2D(nightTexture, vUV).rgba;
+            vec3 diffuseColor = texture2D(diffuseTexture, vUV).rgb;
+
+            color = diffuseColor * lightDiffuse + (nightColor.rgb * nightColor.a * pow((1.0 - lightDiffuse), 6.0));
+            gl_FragColor = vec4(color, 1.0);
+        }
+    </script>
+
+    <!-- -->
+
+    <script type="application/vertexShader" id="cloudsVertex">
+        precision highp float;
+
+        // Attributes
+        attribute vec3 position;
+        attribute vec3 normal;
+        attribute vec2 uv;
+
+        // Uniforms
+        uniform mat4 world;
+        uniform mat4 worldViewProjection;
+
+        // Varying
+        varying vec2 vUV;
+        varying vec3 vPositionW;
+        varying vec3 vNormalW;
+
+        void main(void) {
+            vec4 outPosition = worldViewProjection * vec4(position, 1.0);
+            gl_Position = outPosition;
+
+            vPositionW = vec3(world * vec4(position, 1.0));
+            vNormalW = normalize(vec3(world * vec4(normal, 0.0)));
+
+            vUV = uv;
+        }
+    </script>
+
+
+    <script type="application/fragmentShader" id="cloudsFragment">
+        precision highp float;
+
+        varying vec3 vPositionW;
+        varying vec3 vNormalW;
+
+        varying vec2 vUV;
+
+        uniform sampler2D cloudsTexture;
+        uniform vec3 cameraPosition;
+        uniform vec3 lightPosition;
+
+
+        float computeFresnelTerm(vec3 viewDirection, vec3 normalW, float bias, float power)
+        {
+            float fresnelTerm = pow(bias + dot(viewDirection, normalW), power);
+            return clamp(fresnelTerm, 0., 1.);
+        }
+
+
+        void main(void) {
+            vec3 viewDirectionW = normalize(cameraPosition - vPositionW); //Нормализованный вектор взгляда от камеры до вершины
+
+            // Light
+            vec3 direction = lightPosition - vPositionW; //Направление от источника света до вершины
+            vec3 lightVectorW = normalize(direction); //Получение нормализованного вектора
+
+            // lighting
+            float lightCos = dot(vNormalW, lightVectorW); //Получаем косинус между направлением нормали вершины и направлением "луча света" вершину
+            float lightDiffuse = max(0., lightCos); //рассчитываем коэфициент освещенности от 0 до 1
+
+            vec3 color = texture2D(cloudsTexture, vUV).rgb; //получаем RGB составляющую цвета текселя по переданной UV координате из текстуры
+            float globalAlpha = clamp(color.r, 0.0, 1.0); //определяем альфа составляющую
+
+            // Fresnel
+            float fresnelTerm = computeFresnelTerm(viewDirectionW, vNormalW, 0.72, 5.0);
+
+            float resultAlpha; //результирующая альфа составляющая
+
+
+            if (fresnelTerm < 0.95) {
+                //это краевая, подсвечиваемая зона сферы
+                float envDiffuse = clamp(pow(fresnelTerm - 0.92, 1.0/2.0) * 2.0, 0.0, 1.0); //Коэфициент рассеивания для смягчения границы перехода между центральной части и частию сияния
+                resultAlpha = fresnelTerm * envDiffuse * lightCos; //получаем прозрачность умножая коэфициент Френеля на косинус мешду светом и взглядом на вершину
+                color = color / 2.0 + vec3(0.0,0.5,0.7); //уменьшаем базовый текстурный цвет на 4 и прибавляем голубой
+            } else {
+                //это центр сферы, должен демонстрировать
+                resultAlpha = fresnelTerm * globalAlpha * lightDiffuse;
+            }
+
+            //эффект заката
+            float backLightCos = dot(viewDirectionW, lightVectorW); //косинус между вектором взгляда на вершину и вектором луча света
+            float cosConst = 0.9; // граница расчета эффекта заката. 0.9 => угол в ~(155 - 205) градусов
+
+            //если угол между вектором взгляда и лучом света  ~(155 - 205) градусов
+            if (backLightCos < -cosConst) {
+               //Обработка свечения с обратной стороны
+               float sunHighlight = pow(backLightCos+cosConst, 2.0); //коэфициент подсветки
+               if (fresnelTerm < 0.9) {
+                   //если это край атмосферы (подсвечиваемая часть) то для нее такой рассчет
+                   sunHighlight *= 65.0; //увеличиваем коэфициент подсветки заката
+                   float envDiffuse = clamp(pow(fresnelTerm - 0.92, 1.0/2.0) * 2.0, 0.0, 1.0);
+                   resultAlpha = sunHighlight; //устанавливаем его как прозрачность
+                   color *= lightDiffuse; //умножаем основной цвет на коэфициент освещенности
+                   color.r += sunHighlight; //увеличиваем красную составляющую на коэфициант подсветки заката
+                   color.g += sunHighlight / 2.0; //увеливаем зеленую составляющую на тот же коэфициент но в 2 раза меньше (чтобы был оранжевый цвета)
+                   gl_FragColor = vec4(color, resultAlpha);
+                   return;
+               } else {
+                   //свечение центральной части сферы
+                   sunHighlight *= 95.0; //увеличиваем коэфициент подсветки заката
+                   sunHighlight *= 1.0 + lightCos; //уменьшить (lightCos < 0.0) свечение при приближении к центр сферы (ограничиваем свечение краями, иначе - подсветим то что не может быть подсвечено)
+                   color = vec3(sunHighlight,sunHighlight / 2.0,0.0);
+                   resultAlpha = sunHighlight; //устанавливаем его как прозрачность
+                   gl_FragColor = vec4(color, resultAlpha);
+                   return;
+               }
+            }
+
+            gl_FragColor = vec4(color * lightDiffuse, resultAlpha);
+        }
+    </script>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+    //здесь будут основные конфиги
+    var config = {
+        PLANET_RADIUS: 50, //радиус земли
+        PLANET_V: 300, // количество вершин
+        MOON_RADIUS: 25, //радиус луны
+        ENV_H: 2, //высота атмосферы
+        SUN_RADIUS: 20,// радиус Солнца
+    };
+
+    //проверяем, поддерживается ли работа фреймворка
+    if (BABYLON.Engine.isSupported()) {
+        var canvas = document.getElementById("canvas"); //находим канвас, в котором будем рисовать сцену
+        var engine = new BABYLON.Engine(canvas, true); //создаем движок
+        var scene = new BABYLON.Scene(engine); //создаем сцену
+
+        //создаем камеру, которая вращается вокруг занной цели (это может быть меш или точка)
+        var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, 3*Math.PI / 7, 110, new BABYLON.Vector3(55, 5, 55), scene);
+        scene.activeCamera = camera; //задаем сцене активную камеру, т.е. ту через которую мы видим сцену
+        camera.attachControl(canvas, true); //добавляем возможность управления камерой
+
+
+        //создаем скайбокс
+        var skybox = BABYLON.Mesh.CreateBox("universe", 10000.0, scene); //создаем гигантский куб
+
+        var skyboxMaterial = new BABYLON.StandardMaterial("universe", scene); //создаем материал
+        skyboxMaterial.backFaceCulling = false; //Включаем видимость меша изнутри
+        skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("textures/universe/universe", scene); //задаем текстуру скайбокса как текстуру отражения
+        skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE; //настраиваем скайбокс текстуру так, чтобы грани были повернуты правильно друг к другу
+        skyboxMaterial.disableLighting = true; //отключаем влияние света
+        skybox.material = skyboxMaterial; //задаем матерал мешу
+
+        //Земля
+        var planet = BABYLON.Mesh.CreateSphere("planet", config.PLANET_V, config.PLANET_RADIUS, scene, true);
+        planet.position = new BABYLON.Vector3(-250.0, -10,0, -250.0); //задам позицию на сцене
+        planet.rotation.z = Math.PI;
+        planet.applyDisplacementMap("/textures/earth-height.png", 0, 1); //применяем карту высот - смещение => от 0 для черных фрагментов до 1 для белых
+
+        var moon = BABYLON.Mesh.CreateSphere("moon", 25, config.MOON_RADIUS, scene); //Луна
+        moon.parent = planet; //задаем родителя - Землю
+        moon.position = new BABYLON.Vector3(-102.0, 0,0, 0.0); //задаем позицию луны
+
+        var moonMat = new BABYLON.StandardMaterial("moonMat", scene); //Материал Луны
+        moonMat.diffuseTexture = new BABYLON.Texture("textures/moon.jpg", scene); //задаем базовую текстуру
+        moonMat.bumpTexture = new BABYLON.Texture("textures/moon_bump.jpg", scene);
+        moonMat.specularTexture = new BABYLON.Texture("textures/moon_spec.jpg", scene);
+
+        moon.material = moonMat; //задаем луне материал
+
+        camera.target = planet; //Задаем точнку вращения камеры
+
+        //создаем точечный источник света в точке 0,0,0
+        var lightSourceMesh = new BABYLON.PointLight("Omni", new BABYLON.Vector3(0.0, 0,0, 0.0), scene);
+        /*цвет света*/
+        lightSourceMesh.diffuse = new BABYLON.Color3(0.5, 0.5, 0.5);
+
+
+        //Материал Земли
+        var planetMat = new BABYLON.ShaderMaterial("planetMat", scene, {
+                    vertexElement: "vertexPlanet",
+                    fragmentElement: "fragmentPlanet",
+                },
+                {
+                    attributes: ["position", "normal", "uv"],
+                    uniforms: ["world", "worldView", "worldViewProjection", "diffuseTexture", "nightTexture"],
+
+                });
+
+        var diffuseTexture = new BABYLON.Texture("textures/earth-diffuse.jpg", scene);
+        var nightTexture = new BABYLON.Texture("textures/earth-night-o2.png", scene);
+
+        planetMat.setVector3("vLightPosition", lightSourceMesh.position); //задаем позицию источника света
+        planetMat.setTexture("diffuseTexture", diffuseTexture); //задаем базовую текстуру материалу
+        planetMat.setTexture("nightTexture", nightTexture);//задаем ночную текстуру материалу
+
+        planetMat.backFaceCulling = false;
+        planet.material = planetMat;
+
+        //Атмосфера
+
+        var cloudsMaterial = new BABYLON.ShaderMaterial("cloudsMaterial", scene, {
+                    vertexElement: "cloudsVertex",
+                    fragmentElement: "cloudsFragment",
+                },
+                {
+                    attributes: ["position", "normal", "uv"],
+                    uniforms: ["world", "worldView", "worldViewProjection", "cloudsTexture", "lightPosition", "cameraPosition"],
+                    needAlphaBlending: true
+                });
+
+        var cloudsTexture = new BABYLON.Texture("textures/earth-c.jpg", scene);
+
+        cloudsMaterial.setTexture("cloudsTexture", cloudsTexture);
+        cloudsMaterial.setVector3("cameraPosition", BABYLON.Vector3.Zero());
+//        cloudsMaterial.backFaceCulling = false;
+
+
+        var cloudsMesh = BABYLON.Mesh.CreateSphere("clouds", config.PLANET_V, config.PLANET_RADIUS + config.ENV_H, scene, true);
+        cloudsMesh.material = cloudsMaterial;
+        cloudsMesh.rotation.z = Math.PI;
+        cloudsMesh.parent = planet;
+
+        //солнце
+        var sun = BABYLON.Mesh.CreateSphere("sun", 15, config.SUN_RADIUS, scene, true);
+        //создаем материал для Солнца
+        var sunMaterial = new BABYLON.StandardMaterial("sunMaterial", scene);
+        //создаем процедурную текстуру (128 - это разрешение)
+        var fireTexture = new BABYLON.FireProceduralTexture("fire", 128, scene);
+        //задаем 6 основный цветов
+        fireTexture.fireColors = [
+            new BABYLON.Color3(1.0,.7,0.3),
+            new BABYLON.Color3(1.0,0.7,0.3),
+            new BABYLON.Color3(1.0,.5,0.0),
+            new BABYLON.Color3(1.0,.5,0.0),
+            new BABYLON.Color3(1.0,1.0,1.0),
+            new BABYLON.Color3(1.0,.5,0.0),
+        ];
+
+        //задаем материалу emissiveTexture
+        sunMaterial.emissiveTexture = fireTexture;
+
+        sun.material = sunMaterial; //присваиваем материал
+        sun.parent = lightSourceMesh; //прикрепляем Солнце к источнику света
+
+        //создаем эффект god rays (name, pixel ratio, camera, целевой меш, quality, метод фильтрации, engine, флаг reusable)
+        var godrays = new BABYLON.VolumetricLightScatteringPostProcess('godrays', 1.0, camera, sun, 100, BABYLON.Texture.BILINEAR_SAMPLINGMODE, engine, false);
+
+        godrays.exposure = 0.95;
+        godrays.decay = 0.96815;
+        godrays.weight = 0.78767;
+        godrays.density = 1.0;
+
+        /*Раскомментируйте чтобы инициировать нужный эффект*/
+//        var postProcess = new BABYLON.BlackAndWhitePostProcess("bandw", 1.0, null, null, engine, true); //black and white
+//        var postProcess = new BABYLON.BlurPostProcess("Horizontal blur", new BABYLON.Vector2(1.5, 0), 1.0, 1.0, null, null, engine, true); //blur
+//        var postProcess = new BABYLON.FxaaPostProcess("fxaa", 1.0, null, null, engine, true); //fxaa
+
+
+        /*добавляем эффект к камере*/
+//        camera.attachPostProcess(postProcess);
+
+        engine.runRenderLoop(function() { //инициируем перерисовку
+
+            planet.rotation.y+= 0.001; //поворот на 0.001 радиана
+
+            var shaderMaterial = scene.getMaterialByName("cloudsMaterial");
+            shaderMaterial.setVector3("cameraPosition", scene.activeCamera.position);
+            shaderMaterial.setVector3("lightPosition", lightSourceMesh.position);
+
+            scene.render(); //перерисовываем сцену (60 раз в секунду)
+        });
+    }
+</script>
+</body>
+                                                                               

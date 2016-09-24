@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <script src="js/babylon.js"></script>
+    <script src="js/hand.minified-1.2.js"></script>
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+    //здесь будут основные конфиги
+    var config = {
+        PLANET_RADIUS: 50, //радиус земли
+        PLANET_V: 300, // количество вершин
+        MOON_RADIUS: 25, //радиус луны
+    };
+
+    //проверяем, поддерживается ли работа фреймворка
+    if (BABYLON.Engine.isSupported()) {
+        var canvas = document.getElementById("canvas"); //находим канвас, в котором будем рисовать сцену
+        var engine = new BABYLON.Engine(canvas, true); //создаем движок
+        var scene = new BABYLON.Scene(engine); //создаем сцену
+
+        //создаем камеру, которая вращается вокруг занной цели (это может быть меш или точка)
+        var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, 3*Math.PI / 7, 110, new BABYLON.Vector3(55, 5, 55), scene);
+        scene.activeCamera = camera; //задаем сцене активную камеру, т.е. ту через которую мы видим сцену
+        camera.attachControl(canvas, true); //добавляем возможность управления камерой
+
+
+        //создаем скайбокс
+        var skybox = BABYLON.Mesh.CreateBox("universe", 10000.0, scene); //создаем гигантский куб
+
+        var skyboxMaterial = new BABYLON.StandardMaterial("universe", scene); //создаем материал
+        skyboxMaterial.backFaceCulling = false; //Включаем видимость меша изнутри
+        skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("textures/universe/universe", scene); //задаем текстуру скайбокса как текстуру отражения
+        skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE; //настраиваем скайбокс текстуру так, чтобы грани были повернуты правильно друг к другу
+        skyboxMaterial.disableLighting = true; //отключаем влияние света
+        skybox.material = skyboxMaterial; //задаем матерал мешу
+
+        //Земля
+        var planet = BABYLON.Mesh.CreateSphere("planet", config.PLANET_V, config.PLANET_RADIUS, scene, true);
+        planet.position = new BABYLON.Vector3(-250.0, -10,0, -250.0); //задам позицию на сцене
+
+        var moon = BABYLON.Mesh.CreateSphere("moon", 25, config.MOON_RADIUS, scene); //Луна
+        moon.parent = planet; //задаем родителя - Землю
+        moon.position = new BABYLON.Vector3(-102.0, 0,0, 0.0); //задаем позицию луны
+
+        camera.target = planet; //Задаем точнку вращения камеры
+
+        //создаем точечный источник света в точке 0,0,0
+        var lightSourceMesh = new BABYLON.PointLight("Omni", new BABYLON.Vector3(0.0, 0,0, 0.0), scene);
+        /*цвет света*/
+        lightSourceMesh.diffuse = new BABYLON.Color3(0.5, 0.5, 0.5);
+
+        engine.runRenderLoop(function() { //инициируем перерисовку
+            scene.render(); //перерисовываем сцену (60 раз в секунду)
+        });
+    }
+</script>
+</body>
