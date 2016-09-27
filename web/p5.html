@@ -139,7 +139,7 @@
 
             // lighting
             float lightCos = dot(vNormalW, lightVectorW); //Получаем косинус между направлением нормали вершины и направлением "луча света" вершину
-            float lightDiffuse = max(0., lightCos); //рассчитываем коэфициент освещенности от 0 до 1
+            float lightDiffuse = max(0., lightCos); //рассчитываем коэффициент освещенности от 0 до 1
 
             vec3 color = texture2D(cloudsTexture, vUV).rgb; //получаем RGB составляющую цвета текселя по переданной UV координате из текстуры
             float globalAlpha = clamp(color.r, 0.0, 1.0); //определяем альфа составляющую
@@ -152,9 +152,9 @@
 
             if (fresnelTerm < 0.95) {
                 //это краевая, подсвечиваемая зона сферы
-                float envDiffuse = clamp(pow(fresnelTerm - 0.92, 1.0/2.0) * 2.0, 0.0, 1.0); //Коэфициент рассеивания для смягчения границы перехода между центральной части и частию сияния
-                resultAlpha = fresnelTerm * envDiffuse * lightCos; //получаем прозрачность умножая коэфициент Френеля на косинус мешду светом и взглядом на вершину
-                color = color / 2.0 + vec3(0.0,0.5,0.7); //уменьшаем базовый текстурный цвет на 4 и прибавляем голубой
+                float envDiffuse = clamp(pow(fresnelTerm - 0.92, 1.0/2.0) * 2.0, 0.0, 1.0); //коэффициент рассеивания для смягчения границы перехода между центральной части и частию сияния
+                resultAlpha = fresnelTerm * envDiffuse * lightCos; //получаем прозрачность умножая коэффициент Френеля на косинус мешду светом и взглядом на вершину
+                color = color / 2.0 + vec3(0.0,0.5,0.7); //уменьшаем базовый текстурный в 2 раза и прибавляем голубой
             } else {
                 //это центр сферы, должен демонстрировать
                 resultAlpha = fresnelTerm * globalAlpha * lightDiffuse;
@@ -167,20 +167,20 @@
             //если угол между вектором взгляда и лучом света  ~(155 - 205) градусов
             if (backLightCos < -cosConst) {
                //Обработка свечения с обратной стороны
-               float sunHighlight = pow(backLightCos+cosConst, 2.0); //коэфициент подсветки
+               float sunHighlight = pow(backLightCos+cosConst, 2.0); //коэффициент подсветки
                if (fresnelTerm < 0.9) {
                    //если это край атмосферы (подсвечиваемая часть) то для нее такой рассчет
-                   sunHighlight *= 65.0; //увеличиваем коэфициент подсветки заката
+                   sunHighlight *= 65.0; //увеличиваем коэффициент подсветки заката
                    float envDiffuse = clamp(pow(fresnelTerm - 0.92, 1.0/2.0) * 2.0, 0.0, 1.0);
                    resultAlpha = sunHighlight; //устанавливаем его как прозрачность
-                   color *= lightDiffuse; //умножаем основной цвет на коэфициент освещенности
-                   color.r += sunHighlight; //увеличиваем красную составляющую на коэфициант подсветки заката
-                   color.g += sunHighlight / 2.0; //увеливаем зеленую составляющую на тот же коэфициент но в 2 раза меньше (чтобы был оранжевый цвета)
+                   color *= lightDiffuse; //умножаем основной цвет на коэффициент освещенности
+                   color.r += sunHighlight; //увеличиваем красную составляющую на коэффициант подсветки заката
+                   color.g += sunHighlight / 2.0; //увеливаем зеленую составляющую на тот же коэффициент но в 2 раза меньше (чтобы был оранжевый цвет)
                    gl_FragColor = vec4(color, resultAlpha);
                    return;
                } else {
                    //свечение центральной части сферы
-                   sunHighlight *= 95.0; //увеличиваем коэфициент подсветки заката
+                   sunHighlight *= 95.0; //увеличиваем коэффициент подсветки заката
                    sunHighlight *= 1.0 + lightCos; //уменьшить (lightCos < 0.0) свечение при приближении к центр сферы (ограничиваем свечение краями, иначе - подсветим то что не может быть подсвечено)
                    color = vec3(sunHighlight,sunHighlight / 2.0,0.0);
                    resultAlpha = sunHighlight; //устанавливаем его как прозрачность
@@ -244,7 +244,7 @@
 
         moon.material = moonMat; //задаем луне материал
 
-        camera.target = planet; //Задаем точнку вращения камеры
+        camera.target = planet; //Задаем точку вращения камеры
 
         //создаем точечный источник света в точке 0,0,0
         var lightSourceMesh = new BABYLON.PointLight("Omni", new BABYLON.Vector3(0.0, 0,0, 0.0), scene);
@@ -303,7 +303,7 @@
         var sunMaterial = new BABYLON.StandardMaterial("sunMaterial", scene);
         //создаем процедурную текстуру (128 - это разрешение)
         var fireTexture = new BABYLON.FireProceduralTexture("fire", 128, scene);
-        //задаем 6 основный цветов
+        //задаем 6 основных цветов
         fireTexture.fireColors = [
             new BABYLON.Color3(1.0,.7,0.3),
             new BABYLON.Color3(1.0,0.7,0.3),

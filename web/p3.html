@@ -94,7 +94,7 @@
         var engine = new BABYLON.Engine(canvas, true); //создаем движок
         var scene = new BABYLON.Scene(engine); //создаем сцену
 
-        //создаем камеру, которая вращается вокруг занной цели (это может быть меш или точка)
+        //создаем камеру, которая вращается вокруг заданной цели (это может быть меш или точка)
         var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, 3*Math.PI / 7, 110, new BABYLON.Vector3(55, 5, 55), scene);
         scene.activeCamera = camera; //задаем сцене активную камеру, т.е. ту через которую мы видим сцену
         camera.attachControl(canvas, true); //добавляем возможность управления камерой
@@ -112,7 +112,7 @@
 
         //Земля
         var planet = BABYLON.Mesh.CreateSphere("planet", config.PLANET_V, config.PLANET_RADIUS, scene, true);
-        planet.position = new BABYLON.Vector3(-250.0, -10,0, -250.0); //задам позицию на сцене
+        planet.position = new BABYLON.Vector3(-250.0, -10,0, -250.0); //задаем позицию на сцене
         planet.rotation.z = Math.PI;
         planet.applyDisplacementMap("/textures/earth-height.png", 0, 1); //применяем карту высот - смещение => от 0 для черных фрагментов до 1 для белых
 

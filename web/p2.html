@@ -36,7 +36,7 @@
         var engine = new BABYLON.Engine(canvas, true); //создаем движок
         var scene = new BABYLON.Scene(engine); //создаем сцену
 
-        //создаем камеру, которая вращается вокруг занной цели (это может быть меш или точка)
+        //создаем камеру, которая вращается вокруг заданной цели (это может быть меш или точка)
         var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, 3*Math.PI / 7, 110, new BABYLON.Vector3(55, 5, 55), scene);
         scene.activeCamera = camera; //задаем сцене активную камеру, т.е. ту через которую мы видим сцену
         camera.attachControl(canvas, true); //добавляем возможность управления камерой
@@ -54,13 +54,13 @@
 
         //Земля
         var planet = BABYLON.Mesh.CreateSphere("planet", config.PLANET_V, config.PLANET_RADIUS, scene, true);
-        planet.position = new BABYLON.Vector3(-250.0, -10,0, -250.0); //задам позицию на сцене
+        planet.position = new BABYLON.Vector3(-250.0, -10,0, -250.0); //задаем позицию на сцене
 
         var moon = BABYLON.Mesh.CreateSphere("moon", 25, config.MOON_RADIUS, scene); //Луна
         moon.parent = planet; //задаем родителя - Землю
         moon.position = new BABYLON.Vector3(-102.0, 0,0, 0.0); //задаем позицию луны
 
-        camera.target = planet; //Задаем точнку вращения камеры
+        camera.target = planet; //Задаем точку вращения камеры
 
         //создаем точечный источник света в точке 0,0,0
         var lightSourceMesh = new BABYLON.PointLight("Omni", new BABYLON.Vector3(0.0, 0,0, 0.0), scene);

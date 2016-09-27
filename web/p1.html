@@ -34,7 +34,7 @@
         var engine = new BABYLON.Engine(canvas, true); //создаем движок
         var scene = new BABYLON.Scene(engine); //создаем сцену
 
-        //создаем камеру, которая вращается вокруг занной цели (это может быть меш или точка)
+        //создаем камеру, которая вращается вокруг заданной цели (это может быть меш или точка)
         var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, 3*Math.PI / 7, 110, new BABYLON.Vector3(55, 5, 55), scene);
         scene.activeCamera = camera; //задаем сцене активную камеру, т.е. ту через которую мы видим сцену
         camera.attachControl(canvas, true); //добавляем возможность управления камерой
